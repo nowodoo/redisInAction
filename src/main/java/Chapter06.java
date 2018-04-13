@@ -549,11 +549,10 @@ public class Chapter06 {
         return createChat(conn, sender, recipients, message, chatId);
     }
 
-    public String createChat(
-        Jedis conn, String sender, Set<String> recipients, String message, String chatId)
-    {
+    public String createChat(Jedis conn, String sender, Set<String> recipients, String message, String chatId) {
         recipients.add(sender);
 
+        //初始化组信息和初始化用户在哪个组里的信息
         Transaction trans = conn.multi();
         for (String recipient : recipients){
             trans.zadd("chat:" + chatId, 0, recipient);
@@ -561,6 +560,7 @@ public class Chapter06 {
         }
         trans.exec();
 
+        //消息进行发送，其实还是使用的一个有序队列
         return sendMessage(conn, chatId, sender, message);
     }
 
