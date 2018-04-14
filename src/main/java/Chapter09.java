@@ -266,25 +266,19 @@ public class Chapter09 {
 
     private long USERS_PER_SHARD = (long)Math.pow(2, 20);
 
-    public void setLocation(
-        Jedis conn, long userId, String country, String state)
-    {
+    public void setLocation(Jedis conn, long userId, String country, String state) {
         String code = getCode(country, state);
 
-        long shardId = userId / USERS_PER_SHARD;
-        int position = (int)(userId % USERS_PER_SHARD);
-        int offset = position * 2;
+        long shardId = userId / USERS_PER_SHARD;  //获取用户的id分片
+        int position = (int)(userId % USERS_PER_SHARD);  //获取便宜的中间值
+        int offset = position * 2; //获取最终的偏移
 
         Pipeline pipe = conn.pipelined();
-        pipe.setrange("location:" + shardId, offset, code);
+        pipe.setrange("location:" + shardId, offset, code);  //location:分片id, 偏移量 code(对应两个字典中的索引即序号)
 
         String tkey = UUID.randomUUID().toString();
         pipe.zadd(tkey, userId, "max");
-        pipe.zunionstore(
-            "location:max",
-            new ZParams().aggregate(ZParams.Aggregate.MAX),
-            tkey,
-            "location:max");
+        pipe.zunionstore("location:max", new ZParams().aggregate(ZParams.Aggregate.MAX), tkey, "location:max");
         pipe.del(tkey);
         pipe.sync();
     }
