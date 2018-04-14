@@ -592,26 +592,38 @@ public class Chapter06 {
 
     @SuppressWarnings("unchecked")
     public List<ChatMessages> fetchPendingMessages(Jedis conn, String recipient) {
+        //遍历名下的所有的群组
         Set<Tuple> seenSet = conn.zrangeWithScores("seen:" + recipient, 0, -1);
         List<Tuple> seenList = new ArrayList<Tuple>(seenSet);
 
+
+        //取出消息里面的数据
         Transaction trans = conn.multi();
+        //遍历此人所在的所有群组
         for (Tuple tuple : seenList){
             String chatId = tuple.getElement();
             int seenId = (int)tuple.getScore();
-            trans.zrangeByScore("msgs:" + chatId, String.valueOf(seenId + 1), "inf");
+            trans.zrangeByScore("msgs:" + chatId, String.valueOf(seenId + 1), "inf");  //去聊天室的消息队列中取出需要的消息
         }
-        List<Object> results = trans.exec();
+        List<Object> results = trans.exec(); //事务完成
+
+
 
         Gson gson = new Gson();
         Iterator<Tuple> seenIterator = seenList.iterator();
         Iterator<Object> resultsIterator = results.iterator();
 
+
         List<ChatMessages> chatMessages = new ArrayList<ChatMessages>();
         List<Object[]> seenUpdates = new ArrayList<Object[]>();
         List<Object[]> msgRemoves = new ArrayList<Object[]>();
+
+
+        //遍历所有的群组
         while (seenIterator.hasNext()){
             Tuple seen = seenIterator.next();
+
+            //获取一个聊天室下面的所有的消息
             Set<String> messageStrings = (Set<String>)resultsIterator.next();
             if (messageStrings.size() == 0){
                 continue;
@@ -619,10 +631,9 @@ public class Chapter06 {
 
             int seenId = 0;
             String chatId = seen.getElement();
-            List<Map<String,Object>> messages = new ArrayList<Map<String,Object>>();
+            List<Map<String,Object>> messages = new ArrayList<Map<String,Object>>();  //反序列化消息的内容
             for (String messageJson : messageStrings){
-                Map<String,Object> message = (Map<String,Object>)gson.fromJson(
-                    messageJson, new TypeToken<Map<String,Object>>(){}.getType());
+                Map<String,Object> message = (Map<String,Object>)gson.fromJson(messageJson, new TypeToken<Map<String,Object>>(){}.getType());
                 int messageId = ((Double)message.get("id")).intValue();
                 if (messageId > seenId){
                     seenId = messageId;
@@ -631,16 +642,21 @@ public class Chapter06 {
                 messages.add(message);
             }
 
+
+            //更新聊天室有序集合里面的接受者的消息接受数量
             conn.zadd("chat:" + chatId, seenId, recipient);
             seenUpdates.add(new Object[]{"seen:" + recipient, seenId, chatId});
 
             Set<Tuple> minIdSet = conn.zrangeWithScores("chat:" + chatId, 0, 0);
-            if (minIdSet.size() > 0){
-                msgRemoves.add(new Object[]{
-                    "msgs:" + chatId, minIdSet.iterator().next().getScore()});
+            if (minIdSet.size() > 0){//表示
+                msgRemoves.add(new Object[]{"msgs:" + chatId, minIdSet.iterator().next().getScore()});
             }
+
+
             chatMessages.add(new ChatMessages(chatId, messages));
         }
+
+
 
         trans = conn.multi();
         for (Object[] seenUpdate : seenUpdates){

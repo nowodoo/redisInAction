@@ -194,6 +194,8 @@ public class Chapter09 {
             CRC32 crc = new CRC32();
             crc.update(key.getBytes());
             long shards = 2 * totalElements / shardSize;
+
+            //将非数字的键转换为crc进行计算。   获取期数字。
             shardId = Math.abs(((int)crc.getValue()) % shards);
         }
         return base + ':' + shardId;
@@ -213,9 +215,8 @@ public class Chapter09 {
         return conn.hget(shard, key);
     }
 
-    public Long shardSadd(
-        Jedis conn, String base, String member, long totalElements, int shardSize)
-    {
+    public Long shardSadd(Jedis conn, String base, String member, long totalElements, int shardSize) {
+        //计算分片的参数
         String shard = shardKey(base, "x" + member, totalElements, shardSize);
         return conn.sadd(shard, member);
     }
@@ -224,6 +225,7 @@ public class Chapter09 {
     public void countVisit(Jedis conn, String sessionId) {
         Calendar today = Calendar.getInstance();
         String key = "unique:" + ISO_FORMAT.format(today.getTime());
+
         long expected = getExpected(conn, key, today);
         long id = Long.parseLong(sessionId.replace("-", "").substring(0, 15), 16);
         if (shardSadd(conn, key, String.valueOf(id), expected, SHARD_SIZE) != 0) {
@@ -414,7 +416,7 @@ public class Chapter09 {
     }
 
     private int bisectLeft(String[] values, String key) {
-        int index = Arrays.binarySearch(values, key);
+        int index = Arrays.binarySearch(values, key);  //使用二分查找去获取字母对应的索引。
         return index < 0 ? Math.abs(index) - 1 : index;
     }
 
