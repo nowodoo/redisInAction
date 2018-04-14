@@ -555,8 +555,8 @@ public class Chapter06 {
         //初始化组信息和初始化用户在哪个组里的信息
         Transaction trans = conn.multi();
         for (String recipient : recipients){
-            trans.zadd("chat:" + chatId, 0, recipient);
-            trans.zadd("seen:" + recipient, 0, chatId);
+            trans.zadd("chat:" + chatId, 0, recipient);   //初始化组信息，就是有哪些分组
+            trans.zadd("seen:" + recipient, 0, chatId);  //初始化那些用户在一个分组里面。
         }
         trans.exec();
 
@@ -565,12 +565,18 @@ public class Chapter06 {
     }
 
     public String sendMessage(Jedis conn, String chatId, String sender, String message) {
+        //获取锁  这个锁是针对聊天室的，任何时刻只能有一个人聊天室里面发送消息
         String identifier = acquireLock(conn, "chat:" + chatId);
         if (identifier == null){
             throw new RuntimeException("Couldn't get the lock");
         }
+
         try {
+            //id消息生成器
             long messageId = conn.incr("ids:" + chatId);
+
+
+            //构建一条消息
             HashMap<String,Object> values = new HashMap<String,Object>();
             values.put("id", messageId);
             values.put("ts", System.currentTimeMillis());
